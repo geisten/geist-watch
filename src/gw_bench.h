@@ -20,6 +20,7 @@
  *   tick_ms      <ms>                      (default 1000)
  *   rule         <id> appeared|sustained yes|no <count> <window_ms> <gap_ms> [<sustain_ms>]
  *   truth        <rule_id> <event_type> <at_ms> [<after_ms>]
+ *   restart      <t_ms>
  *   sample       <t_ms> <frame|-> <rule_id>=<yes|no|unknown> ...
  *
  * `sample` carries a label per rule so the harness runs today, with no
@@ -39,6 +40,7 @@ enum {
     GW_BENCH_MAX_DETECTIONS = 256,
     GW_BENCH_PATH_CAP = 128,
     GW_BENCH_TYPE_CAP = 32,
+    GW_BENCH_MAX_RESTARTS = 8,
 };
 
 enum gw_split {
@@ -91,6 +93,15 @@ struct gw_scene {
      * smallest rule's max_gap, or a gap could pass between two ticks
      * unnoticed; the parser checks that. */
     int64_t tick_ns;
+
+    /* Process restarts, in time order. At each one the watch is
+     * re-initialised mid-scene: every rule returns to unknown, disarmed,
+     * with no sustained run. The plan lists a restart among the
+     * sequences a scene must contain, and it is the one event that
+     * cannot be expressed as a label — nothing the camera sees says the
+     * process died. */
+    int64_t  restarts[GW_BENCH_MAX_RESTARTS];
+    uint32_t restart_count;
 };
 
 /* Parse a manifest. On failure writes a one-line reason into `err`

@@ -58,7 +58,29 @@ static enum gw_status walk(const struct gw_scene *scene, const uint32_t cap,
      * or it measures a system nobody ships. */
     uint32_t n = 0u;
     uint32_t next = 0u;
+    uint32_t next_restart = 0u;
     for (int64_t now = scene->samples[0].t_ns;; now += scene->tick_ns) {
+        /* A restart takes effect before anything else at its tick, so a
+         * sample at the same instant reaches the NEW process. Re-
+         * initialising is the whole event: rules return to unknown,
+         * disarmed, with no sustained run, exactly as a fresh process
+         * starts. Nothing the camera sees says the process died, which
+         * is why this cannot be expressed as a label. */
+        while (next_restart < scene->restart_count && scene->restarts[next_restart] <= now) {
+            s = gw_init(&w, scene->camera);
+            if (s != GW_OK) {
+                return s;
+            }
+            for (uint32_t i = 0u; i < scene->rule_count; i += 1u) {
+                uint32_t idx = 0u;
+                s = gw_add_rule(&w, &scene->rules[i], &idx);
+                if (s != GW_OK) {
+                    return s;
+                }
+            }
+            next_restart += 1u;
+        }
+
         while (next < scene->sample_count && scene->samples[next].t_ns <= now) {
             const struct gw_sample *smp = &scene->samples[next];
             for (uint32_t r = 0u; r < scene->rule_count; r += 1u) {

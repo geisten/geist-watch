@@ -1,0 +1,32 @@
+# geist-watch scene manifest — NEGATIVE scene.
+# No `truth` lines: the correct outcome is that nothing is emitted. If
+# the core ever fires here, the harness reports a false positive and the
+# precision floor fails the run.
+version 1
+scene doorstep-restart
+split test
+camera cam-front
+match_window 45000
+tick_ms 1000
+
+rule doorstep appeared yes 3 10000 15000
+
+# Absence is confirmed, the rule arms, and then the process restarts
+# before the parcel arrives. The new process has no memory of the
+# confirmed absence, so it is disarmed, and the parcel it finds is an
+# initial state rather than a delivery it watched happen.
+#
+# No truth event: the delivery genuinely was not observed by any single
+# running process, and claiming it would be claiming knowledge the
+# restart destroyed.
+
+sample 0 - doorstep=no
+sample 5000 - doorstep=no
+sample 10000 - doorstep=no
+restart 12000
+sample 15000 - doorstep=yes
+sample 20000 - doorstep=yes
+sample 25000 - doorstep=yes
+sample 30000 - doorstep=yes
+sample 35000 - doorstep=yes
+sample 40000 - doorstep=yes

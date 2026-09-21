@@ -338,6 +338,20 @@ enum gw_status gw_scene_parse(const char *text, const size_t err_cap, char *err,
             s = parse_rule(&p, &cur);
         } else if (strcmp(kw, "truth") == 0) {
             s = parse_truth(&p, &cur);
+        } else if (strcmp(kw, "restart") == 0) {
+            if (out->restart_count >= (uint32_t)GW_BENCH_MAX_RESTARTS) {
+                return fail(&p, GW_E_LIMIT, "more than %d restarts", GW_BENCH_MAX_RESTARTS);
+            }
+            int64_t at_ms = 0;
+            if (!parse_i64(next_token(&cur), &at_ms) || at_ms < 0) {
+                return fail(&p, GW_E_INVALID_ARG, "restart needs a non-negative t_ms");
+            }
+            const int64_t at_ns = at_ms * NS_PER_MS;
+            if (out->restart_count > 0u && at_ns < out->restarts[out->restart_count - 1u]) {
+                return fail(&p, GW_E_INVALID_ARG, "restarts must be in time order");
+            }
+            out->restarts[out->restart_count] = at_ns;
+            out->restart_count += 1u;
         } else if (strcmp(kw, "sample") == 0) {
             s = parse_sample(&p, &cur);
         } else {

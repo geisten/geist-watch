@@ -276,6 +276,52 @@ static void test_replay_ticks_through_an_outage(void) {
     CHECK_EQ_INT(n, 0); /* the outage disarmed it; no delivery is claimed */
 }
 
+/* --- restarts ------------------------------------------------------- */
+
+static void test_restart_is_parsed_in_order(void) {
+    char err[256] = "";
+    CHECK_OK(gw_scene_parse("version 1\nscene s\ncamera c\nmatch_window 1000\n"
+                            "rule a appeared yes 1 0 15000\n"
+                            "restart 5000\nrestart 9000\n"
+                            "sample 0 - a=yes\n",
+                            sizeof err, err, &g_scene));
+    CHECK_EQ_INT(g_scene.restart_count, 2);
+    CHECK_EQ_INT(g_scene.restarts[0], 5000 * NS_MS);
+    expect_parse_error("version 1\nscene s\ncamera c\nmatch_window 1000\n"
+                       "rule a appeared yes 1 0 15000\n"
+                       "restart 9000\nrestart 5000\n"
+                       "sample 0 - a=yes\n",
+                       "restarts must be in time order");
+}
+
+/* A restart mid-scene discards the confirmed absence that armed the
+ * rule, so the parcel the new process finds is an initial state rather
+ * than a delivery. Without the restart the same label stream fires —
+ * which is what makes this scene a test rather than a tautology. */
+static void test_restart_disarms_the_rule(void) {
+    static const char *WITH = "version 1\nscene s\ncamera c\nmatch_window 45000\ntick_ms 1000\n"
+                              "rule a appeared yes 3 10000 15000\n"
+                              "sample 0 - a=no\nsample 5000 - a=no\nsample 10000 - a=no\n"
+                              "restart 12000\n"
+                              "sample 15000 - a=yes\nsample 20000 - a=yes\nsample 25000 - a=yes\n";
+    static const char *WITHOUT =
+        "version 1\nscene s\ncamera c\nmatch_window 45000\ntick_ms 1000\n"
+        "rule a appeared yes 3 10000 15000\n"
+        "sample 0 - a=no\nsample 5000 - a=no\nsample 10000 - a=no\n"
+        "sample 15000 - a=yes\nsample 20000 - a=yes\nsample 25000 - a=yes\n";
+    char err[256] = "";
+    struct gw_detection d[GW_BENCH_MAX_DETECTIONS];
+    uint32_t n = 0u;
+
+    CHECK_OK(gw_scene_parse(WITH, sizeof err, err, &g_scene));
+    CHECK_OK(gw_replay(&g_scene, GW_BENCH_MAX_DETECTIONS, d, &n));
+    CHECK_EQ_INT(n, 0);
+
+    CHECK_OK(gw_scene_parse(WITHOUT, sizeof err, err, &g_scene));
+    CHECK_OK(gw_replay(&g_scene, GW_BENCH_MAX_DETECTIONS, d, &n));
+    CHECK_EQ_INT(n, 1);
+}
+
 int main(void) {
     RUN(test_minimal_manifest);
     RUN(test_omitted_label_is_not_unknown);
@@ -290,5 +336,7 @@ int main(void) {
     RUN(test_wilson_matches_the_published_value);
     RUN(test_unknown_time_counts_against_availability);
     RUN(test_replay_ticks_through_an_outage);
+    RUN(test_restart_is_parsed_in_order);
+    RUN(test_restart_disarms_the_rule);
     return TEST_MAIN;
 }
