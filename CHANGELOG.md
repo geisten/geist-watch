@@ -18,6 +18,14 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   (a package arrives) and `GW_RULE_SUSTAINED` (a door stays open).
 - Versioned JSONL event rendering (`gw_event_render`) at schema
   version 1, into caller-provided buffers.
+- Replay and scoring harness (plan work package W02): a line-oriented
+  scene manifest with ground truth, `gw_replay`, and `gw_score` with
+  one-to-one window matching, TP/FP/FN, Wilson intervals on precision
+  and recall, and availability that keeps unknown time in the
+  denominator. `make bench` replays every scene against the v0.1 floors.
+- Three synthetic scenes under `benchmarks/scenes/`, so the harness runs
+  before any footage exists. They are not evidence about detection
+  quality; `benchmarks/README.md` says so and says what replaces them.
 
 ### Notes
 

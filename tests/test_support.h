@@ -40,6 +40,18 @@ static int gw_test_failures = 0;
 
 #define CHECK_OK(expr) CHECK_EQ_INT((expr), GW_OK)
 
+#define CHECK_NEAR(actual, expected, tol)                                                          \
+    do {                                                                                           \
+        const double a_ = (double)(actual);                                                        \
+        const double e_ = (double)(expected);                                                      \
+        const double d_ = a_ > e_ ? a_ - e_ : e_ - a_;                                             \
+        if (!(d_ <= (double)(tol))) {                                                              \
+            fprintf(stderr, "  %s:%d: %s == %.6f, expected %.6f +- %.6f\n", __FILE__, __LINE__,    \
+                    #actual, a_, e_, (double)(tol));                                               \
+            gw_test_failures += 1;                                                                 \
+        }                                                                                          \
+    } while (0)
+
 #define RUN(fn)                                                                                    \
     do {                                                                                           \
         const int before_ = gw_test_failures;                                                      \

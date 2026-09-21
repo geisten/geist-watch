@@ -1,0 +1,35 @@
+# geist-watch scene manifest
+# Held-out counterpart to doorstep-dev, and the scene that pins the two
+# precision-favouring decisions in the core as observable facts:
+#
+#   1. A parcel already present at startup is an initial STATE. If that
+#      ever starts emitting an event, this scene reports a false alarm.
+#   2. Coming back from an observation gap to a parcel that is simply
+#      there is not a delivery. There is deliberately no ground-truth
+#      event for it — the plan accepts the miss inside the gap as a
+#      documented sampling limit and prefers it to a fabricated arrival.
+version 1
+scene doorstep-test
+split test
+camera cam-side
+match_window 45000
+
+rule doorstep appeared yes 3 10000 15000
+
+truth doorstep package_appeared 115000
+
+sample 0 - doorstep=yes
+sample 5000 - doorstep=yes
+sample 10000 - doorstep=yes
+sample 15000 - doorstep=no
+sample 20000 - doorstep=no
+sample 25000 - doorstep=no
+sample 85000 - doorstep=yes
+sample 90000 - doorstep=yes
+sample 95000 - doorstep=yes
+sample 100000 - doorstep=no
+sample 105000 - doorstep=no
+sample 110000 - doorstep=no
+sample 115000 - doorstep=yes
+sample 120000 - doorstep=yes
+sample 125000 - doorstep=yes

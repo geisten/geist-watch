@@ -1,0 +1,49 @@
+# geist-watch scene manifest
+# The five-minute door rule at its threshold. Sampling every 10 s keeps
+# evidence inside the 15 s gap; the event is due at 302 s (confirmed open
+# at 2 s) and lands at the first tick after that.
+version 1
+scene door-dev
+split dev
+camera cam-hall
+match_window 30000
+
+rule front-door sustained yes 2 2000 15000 300000
+
+truth front-door door_open_sustained 302000
+
+sample 0 - front-door=yes
+sample 2000 - front-door=yes
+sample 10000 - front-door=yes
+sample 20000 - front-door=yes
+sample 30000 - front-door=yes
+sample 40000 - front-door=yes
+sample 50000 - front-door=yes
+sample 60000 - front-door=yes
+sample 70000 - front-door=yes
+sample 80000 - front-door=yes
+sample 90000 - front-door=yes
+sample 100000 - front-door=yes
+sample 110000 - front-door=yes
+sample 120000 - front-door=yes
+sample 130000 - front-door=yes
+sample 140000 - front-door=yes
+sample 150000 - front-door=yes
+sample 160000 - front-door=yes
+sample 170000 - front-door=yes
+sample 180000 - front-door=yes
+sample 190000 - front-door=yes
+sample 200000 - front-door=yes
+sample 210000 - front-door=yes
+sample 220000 - front-door=yes
+sample 230000 - front-door=yes
+sample 240000 - front-door=yes
+sample 250000 - front-door=yes
+sample 260000 - front-door=yes
+sample 270000 - front-door=yes
+sample 280000 - front-door=yes
+sample 290000 - front-door=yes
+sample 300000 - front-door=yes
+sample 310000 - front-door=yes
+sample 320000 - front-door=yes
+sample 330000 - front-door=yes
