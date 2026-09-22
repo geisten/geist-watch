@@ -60,8 +60,14 @@ format:
 format-check:
 	@clang-format --dry-run --Werror include/*.h src/*.c tests/*.c tests/*.h
 
+# One file at a time: `clang --analyze` writes a report per input and
+# refuses a single -o for several of them. BENCH_SRC is empty until the
+# harness exists, so this covers whatever the tree has.
 analyze:
-	$(CC) --analyze $(CPPFLAGS) $(BASE_FLAGS) -Iinclude -Isrc $(CORE_SRC) -o /dev/null
+	@for f in $(CORE_SRC) $(BENCH_SRC); do \
+	    echo "  analyze $$f"; \
+	    $(CC) --analyze $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc $$f -o /dev/null || exit 1; \
+	done
 
 clean:
 	rm -rf $(BUILD)
