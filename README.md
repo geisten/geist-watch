@@ -18,6 +18,7 @@ states and events, and the versioned JSONL those events are written as.
 ```sh
 make check              # model-free C tests plus the header contract
 make MODE=asan check    # the same, under ASan/UBSan
+make bench              # replay the scenes, report TP/FP/FN and availability
 ```
 
 No engine, no model, no camera, no network. The core does not allocate and
@@ -25,10 +26,16 @@ never reads the clock — time is an argument on every call, which is what lets
 the five-minute door rule be tested at its 299/300-second boundary instead of
 waiting. `include/geist_watch.h` is the whole API.
 
-Capture, the model adapter, the CLI, packaging and the Raspberry Pi benchmark
-harness belong to later work packages and are not present yet. Small-model
-support and Pi performance must be demonstrated before the release model is
-chosen; the engine is not pinned until then.
+`make bench` scores recorded scenes against ground truth — one-to-one window
+matching, TP/FP/FN, Wilson intervals, and an availability figure that keeps
+blind time in the denominator (`benchmarks/README.md`). The scenes shipped
+today are synthetic placeholders so the harness runs before any footage
+exists; they are not evidence about detection quality.
+
+Capture, the model adapter, the CLI, packaging and the Raspberry Pi
+performance harness belong to later work packages and are not present yet.
+Small-model support and Pi performance must be demonstrated before the release
+model is chosen; the engine is not pinned until then.
 
 The implementation uses C23 and GNU Make, following geist-memory and
 geist-diktat.

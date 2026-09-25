@@ -11,12 +11,18 @@ include mk/config.mk
 CORE_SRC := src/gw_state.c src/gw_event.c
 CORE_OBJ := $(CORE_SRC:src/%.c=$(BUILD)/%.o)
 
+# Benchmark harness. Not part of libgeist_watch.a: scoring a run is a
+# measurement concern, not product runtime, and the library stays the
+# model-free state core the plan describes.
+BENCH_SRC   := src/gw_manifest.c src/gw_score.c
+BENCH_SCENES := $(wildcard benchmarks/scenes/*.scene)
+
 TEST_SRC  := $(wildcard tests/test_*.c)
 TEST_BINS := $(TEST_SRC:tests/%.c=$(BUILD)/%)
 
 COMPILE = $(CC) $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc
 
-.PHONY: all lib check test check-headers format format-check analyze clean help print-config
+.PHONY: all lib check test check-headers format format-check analyze clean help print-config bench
 
 all: lib
 
@@ -32,8 +38,18 @@ $(LIB): $(CORE_OBJ)
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(BUILD)/%: tests/%.c $(CORE_SRC) | $(BUILD)
-	$(COMPILE) -Itests $< $(CORE_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -o $@
+$(BUILD)/%: tests/%.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
+	$(COMPILE) -Itests $< $(CORE_SRC) $(BENCH_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
+
+$(BUILD)/replay: benchmarks/replay.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
+	$(COMPILE) $^ $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
+
+# Replay every scene and report. Model-free: the scenes carry labels that
+# stand in for the model, so this runs with no engine and no footage.
+# Floors are the plan's v0.1 targets, and are targets rather than
+# measurements until real scenes replace the synthetic ones.
+bench: $(BUILD)/replay
+	$(BUILD)/replay --min-precision 0.95 --min-recall 0.90 $(BENCH_SCENES)
 
 # The model-free gate. This is what must pass on every supported platform
 # with no engine, no model and no camera present.
@@ -85,6 +101,7 @@ help:
 	@echo "  make check           model-free C tests plus the header contract"
 	@echo "  make MODE=asan check same, under ASan/UBSan"
 	@echo "  make format-check    clang-format, no changes made"
+	@echo "  make bench           replay the scenes and report TP/FP/FN"
 	@echo "  make analyze         clang static analysis"
 	@echo "  make print-config    effective configuration"
 	@echo ""

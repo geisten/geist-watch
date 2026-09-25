@@ -1,0 +1,30 @@
+# geist-watch scene manifest
+# Synthetic. Written by hand so the harness is exercisable before any
+# footage exists; replaced by recorded scenes once W02 data collection
+# runs. Labels stand in for what a VLM will answer.
+version 1
+scene doorstep-dev
+split dev
+camera cam-front
+match_window 45000
+
+rule doorstep appeared yes 3 10000 15000
+
+# A delivery, then a pickup, then a second parcel. The ground-truth time
+# is when the parcel first becomes visible; confirmation legitimately
+# lands later, which is what the 45 s match window is for.
+truth doorstep package_appeared 15000
+truth doorstep package_appeared 45000
+
+sample 0 - doorstep=no
+sample 5000 - doorstep=no
+sample 10000 - doorstep=no
+sample 15000 - doorstep=yes
+sample 20000 - doorstep=yes
+sample 25000 - doorstep=yes
+sample 30000 - doorstep=no
+sample 35000 - doorstep=no
+sample 40000 - doorstep=no
+sample 45000 - doorstep=yes
+sample 50000 - doorstep=yes
+sample 55000 - doorstep=yes

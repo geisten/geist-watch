@@ -64,6 +64,11 @@ jobs:
       - name: Library builds
         run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} lib
 
+      # The scenes are synthetic and carry their own labels, so the
+      # harness is model-free like everything else in this job.
+      - name: Replay harness against the scenes
+        run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} bench
+
   style:
     name: format and static analysis
     runs-on: ubuntu-24.04
