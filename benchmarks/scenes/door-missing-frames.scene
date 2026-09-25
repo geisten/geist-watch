@@ -1,0 +1,42 @@
+# geist-watch scene manifest — NEGATIVE scene.
+# No `truth` lines: the correct outcome is that nothing is emitted. If
+# the core ever fires here, the harness reports a false positive and the
+# precision floor fails the run.
+version 1
+scene door-missing-frames
+split test
+camera cam-hall
+match_window 30000
+tick_ms 1000
+
+rule front-door sustained yes 2 2000 15000 300000
+
+# Capture dies at 100 s and returns at 400 s, with the door open on both
+# sides of the gap. Five minutes of wall-clock pass with the door open
+# at each end — and nothing observed in between, so there is no
+# five-minute stretch of EVIDENCE. Counting elapsed time rather than
+# confirmed time would report an event the camera never witnessed.
+
+sample 0 - front-door=yes
+sample 2000 - front-door=yes
+sample 10000 - front-door=yes
+sample 20000 - front-door=yes
+sample 30000 - front-door=yes
+sample 40000 - front-door=yes
+sample 50000 - front-door=yes
+sample 60000 - front-door=yes
+sample 70000 - front-door=yes
+sample 80000 - front-door=yes
+sample 90000 - front-door=yes
+sample 100000 - front-door=yes
+sample 400000 - front-door=yes
+sample 410000 - front-door=yes
+sample 420000 - front-door=yes
+sample 430000 - front-door=yes
+sample 440000 - front-door=yes
+sample 450000 - front-door=yes
+sample 460000 - front-door=yes
+sample 470000 - front-door=yes
+sample 480000 - front-door=yes
+sample 490000 - front-door=yes
+sample 500000 - front-door=yes

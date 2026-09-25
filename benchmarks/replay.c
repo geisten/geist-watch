@@ -40,17 +40,29 @@ static const char *split_name(const enum gw_split s) {
     return buf;
 }
 
+/* A rule with nothing to measure against is not a rule that scored zero.
+ * Printing 0.000 for both would read as total failure, which is exactly
+ * backwards for a negative scene: there, emitting nothing is the pass. */
+static bool measured(const struct gw_metrics *m) {
+    return (m->true_positives + m->false_positives + m->false_negatives) > 0u;
+}
+
 static void report_human(const struct gw_scene *sc, uint32_t rule, const struct gw_metrics *m) {
     printf("  rule %-18s TP %-3u FP %-3u FN %-3u", sc->rules[rule].id, m->true_positives,
            m->false_positives, m->false_negatives);
-    printf("  precision %.3f [%.3f-%.3f]", m->precision, m->precision_lo, m->precision_hi);
-    printf("  recall %.3f [%.3f-%.3f]", m->recall, m->recall_lo, m->recall_hi);
+    if (measured(m)) {
+        printf("  precision %.3f [%.3f-%.3f]", m->precision, m->precision_lo, m->precision_hi);
+        printf("  recall %.3f [%.3f-%.3f]", m->recall, m->recall_lo, m->recall_hi);
+    } else {
+        printf("  %-46s", "(negative scene: no events expected, none emitted)");
+    }
     printf("  availability %.3f\n", m->availability);
 }
 
 static void report_json(const struct gw_scene *sc, uint32_t rule, const struct gw_metrics *m) {
     printf("{\"scene\":\"%s\",\"split\":\"%s\",\"rule\":\"%s\"", sc->name, split_name(sc->split),
            sc->rules[rule].id);
+    printf(",\"measured\":%s", measured(m) ? "true" : "false");
     printf(",\"tp\":%u,\"fp\":%u,\"fn\":%u", m->true_positives, m->false_positives,
            m->false_negatives);
     printf(",\"precision\":%.6f,\"precision_lo\":%.6f,\"precision_hi\":%.6f", m->precision,
@@ -125,17 +137,17 @@ int main(int argc, char **argv) {
             } else {
                 report_human(&scene, r, &m);
             }
-            /* Floors apply only where the rule has ground truth to be
-             * measured against; a rule with no truth events in this
-             * scene is not evidence of anything either way. */
-            const bool measured =
-                (m.true_positives + m.false_positives + m.false_negatives) > 0u;
-            if (measured && min_precision >= 0.0 && m.precision < min_precision) {
+            /* Floors apply only where there is something to measure. A
+             * negative scene that stays silent has nothing to fail; one
+             * that fires has a false positive, which makes it measured
+             * and drives precision to zero — so the floor catches it. */
+            const bool has_numbers = measured(&m);
+            if (has_numbers && min_precision >= 0.0 && m.precision < min_precision) {
                 fprintf(stderr, "replay: %s/%s precision %.3f below floor %.3f\n", scene.name,
                         scene.rules[r].id, m.precision, min_precision);
                 failures += 1;
             }
-            if (measured && min_recall >= 0.0 && m.recall < min_recall) {
+            if (has_numbers && min_recall >= 0.0 && m.recall < min_recall) {
                 fprintf(stderr, "replay: %s/%s recall %.3f below floor %.3f\n", scene.name,
                         scene.rules[r].id, m.recall, min_recall);
                 failures += 1;

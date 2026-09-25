@@ -23,9 +23,18 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   one-to-one window matching, TP/FP/FN, Wilson intervals on precision
   and recall, and availability that keeps unknown time in the
   denominator. `make bench` replays every scene against the v0.1 floors.
-- Three synthetic scenes under `benchmarks/scenes/`, so the harness runs
-  before any footage exists. They are not evidence about detection
-  quality; `benchmarks/README.md` says so and says what replaces them.
+- Ten synthetic scenes under `benchmarks/scenes/`, so the harness runs
+  before any footage exists — three positive and seven negative, covering
+  the sequences from the release criteria whose test is the shape of the
+  observation stream rather than the model's visual judgment. Each
+  negative scene is mutation-checked: remove what it guards and it emits
+  the event it otherwise withholds. They are not evidence about detection
+  quality; `benchmarks/README.md` says so, and says which sequences only
+  real footage can settle.
+- `restart <t_ms>` in the scene manifest, re-initialising the watch
+  mid-scene. A process restart is the one sequence the criteria list that
+  cannot be expressed as a label: nothing the camera sees says the
+  process died.
 
 ### Notes
 

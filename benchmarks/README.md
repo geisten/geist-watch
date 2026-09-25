@@ -10,11 +10,11 @@ found, so a published number can be re-derived instead of trusted.
 
 ## Status of the numbers here
 
-**The scenes in `scenes/` are synthetic and hand-written.** They exist so
-the harness is exercisable before any footage does, and so the two
-precision-favouring decisions in the core are pinned as observable facts
-rather than prose. They are not evidence about detection quality, and no
-result from them belongs in a release claim.
+**The ten scenes in `scenes/` are synthetic and hand-written** — three
+positive, seven negative. They exist so the harness is exercisable before
+any footage does, and so the core's precision-favouring decisions are
+pinned as observable facts rather than prose. They are not evidence about
+detection quality, and no result from them belongs in a release claim.
 
 Real scenes replace them once the data collection in W02 runs. The
 release criteria ask for at least 50 positive placement sequences across
@@ -36,8 +36,15 @@ match_window <after_ms> [<before_ms>]
 tick_ms      <ms>
 rule         <id> appeared|sustained yes|no <count> <window_ms> <gap_ms> [<sustain_ms>]
 truth        <rule_id> <event_type> <at_ms> [<after_ms>]
+restart      <t_ms>
 sample       <t_ms> <frame|-> <rule_id>=<yes|no|unknown> ...
 ```
+
+A scene with no `truth` lines is a **negative** scene: the correct
+outcome is that nothing is emitted. `restart` re-initialises the watch
+mid-scene — a process restart is the one sequence in the release criteria
+that cannot be expressed as a label, because nothing the camera sees says
+the process died.
 
 Each `sample` carries a label per rule. Those labels stand in for what a
 VLM will answer once one is chosen, which is what makes the harness run
@@ -105,6 +112,55 @@ measurements**: the plan fixes a hardware profile after the first
 feasibility run and freezes thresholds before the final test. A floor
 applies only to a rule that has ground truth in that scene — a rule with
 no truth events is not evidence either way.
+
+## What the scenes cover, and what they cannot
+
+The release criteria list the sequences a scene set must contain. They
+split into two kinds, and the difference decides what a synthetic label
+is worth.
+
+**The label pattern IS the scenario.** These are answerable today,
+because what makes them a test is the shape of the observation stream,
+not the model's visual judgment:
+
+| Sequence | Scene | Pinned behaviour |
+| :-- | :-- | :-- |
+| parcel present at start | `doorstep-test` | initial state, not a delivery |
+| placement, pickup, second placement | `doorstep-dev` | one event each, re-armed only by confirmed absence |
+| person carrying a parcel past | `doorstep-passerby` | two positive frames confirm nothing |
+| occlusion | `doorstep-test` | no delivery claimed on return |
+| camera failure | `doorstep-camera-shift` | evidence expires, availability collapses |
+| camera knocked out of alignment | `doorstep-camera-shift` | unanswerable region stays unknown |
+| process restart | `doorstep-restart` | no armed state survives it |
+| door: brief opening | `door-brief-opening` | duration, not transition |
+| door: 299/300 s boundary | `door-dev` | fires at the threshold, not before |
+| door: closes in between | `door-interrupted` | 500 s of open door, no unbroken 300 |
+| door: missing frames | `door-missing-frames` | elapsed time is not confirmed time |
+| door: process restart | `doorstep-restart` (same mechanism) | no duration carried across |
+
+Each negative scene was checked by mutation: remove the thing it guards
+— the interruption, the restart, the frame gap — and it emits the event
+it otherwise withholds. A negative scene that passes because nothing
+could ever have fired is not a test.
+
+**The label IS the model's judgment.** These cannot be answered by a
+synthetic scene, and pretending otherwise would be asserting the
+conclusion:
+
+| Sequence | Status |
+| :-- | :-- |
+| bag instead of a parcel | open — whether the model says yes is the question |
+| shadow, backlight, dusk | partially: `doorstep-flicker` pins that an unstable answer produces no event. Whether hard light actually destabilises the answer, or produces a confident wrong one, only footage settles |
+
+Labelling a bag `yes` here would report a false positive that measures a
+model failure invented by the author of the scene; labelling it `no`
+would test nothing at all. Both belong to W03 and real material.
+
+## Clock jumps
+
+The core refuses time that moves backwards (`GW_E_TIME`), and a manifest
+requires samples in time order, so a backwards jump is not expressible as
+a scene. It is covered in `tests/test_state.c` instead.
 
 ## What is not here yet
 
