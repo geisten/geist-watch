@@ -31,6 +31,20 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   the event it otherwise withholds. They are not evidence about detection
   quality; `benchmarks/README.md` says so, and says which sequences only
   real footage can settle.
+- Rule layer (`src/gw_rule.h`, first half of plan work package W07):
+  `gw_rule_compile` turns a German or English template sentence plus
+  explicit parameters into a validated `gw_rule_config`, and
+  `gw_region_parse`/`gw_region_pixels` handle normalised regions in
+  parts per million with exact integer conversion to pixels and no
+  locale dependency. Two templates today — `doorstep-package` and
+  `door-open` — whose defaults are the same numbers the benchmark scenes
+  use. Unrecognised sentences, negations, two templates in one sentence,
+  a duration a template cannot honour, and a sentence duration that
+  contradicts an explicit one are all refused with a reason rather than
+  interpreted. The compiler validates its own output by handing it to
+  `gw_add_rule`, so it cannot produce a configuration the core will not
+  run. Not part of `libgeist_watch.a`: the library stays the model-free
+  timing core.
 - `make format-check` now covers `src/*.h`, which it had been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch
   mid-scene. A process restart is the one sequence the criteria list that
