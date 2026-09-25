@@ -30,7 +30,7 @@ static const char *split_name(const enum gw_split s) {
         return nullptr;
     }
     const size_t n = fread(buf, 1u, cap - 1u, f);
-    const bool   too_big = !feof(f);
+    const bool too_big = !feof(f);
     (void)fclose(f);
     if (too_big) {
         fprintf(stderr, "replay: %s is larger than %u bytes\n", path, (unsigned)cap - 1u);
@@ -74,9 +74,9 @@ static void report_json(const struct gw_scene *sc, uint32_t rule, const struct g
 }
 
 int main(int argc, char **argv) {
-    bool   json = false;
+    bool json = false;
     double min_precision = -1.0, min_recall = -1.0;
-    int    first = 1;
+    int first = 1;
 
     for (; first < argc; first += 1) {
         if (strcmp(argv[first], "--json") == 0) {
@@ -99,23 +99,23 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    static char            text[FILE_CAP];
+    static char text[FILE_CAP];
     static struct gw_scene scene;
     static struct gw_detection dets[GW_BENCH_MAX_DETECTIONS];
-    int                        failures = 0;
+    int failures = 0;
 
     for (int i = first; i < argc; i += 1) {
         if (slurp(argv[i], text, sizeof text) == nullptr) {
             return 1;
         }
-        char                 err[256];
+        char err[256];
         const enum gw_status ps = gw_scene_parse(text, sizeof err, err, &scene);
         if (ps != GW_OK) {
             fprintf(stderr, "replay: %s: %s\n", argv[i], err);
             return 1;
         }
 
-        uint32_t             n = 0u;
+        uint32_t n = 0u;
         const enum gw_status rs = gw_replay(&scene, GW_BENCH_MAX_DETECTIONS, dets, &n);
         if (rs != GW_OK) {
             fprintf(stderr, "replay: %s: %s\n", argv[i], gw_status_str(rs));

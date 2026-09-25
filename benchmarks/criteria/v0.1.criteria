@@ -1,0 +1,24 @@
+# Release criteria for v0.1, as plan section 9 states them.
+#
+# These are TARGETS, not measurements — the plan says so in as many words,
+# and this file is committed before any hardware number exists precisely so
+# that it cannot be adjusted to fit one later. A criterion changed after a
+# run must be changed in a commit of its own, with a reason.
+#
+# Only what the plan quantifies is here. The plan also asks for a hardware
+# profile to be fixed after the first feasibility run and for thresholds to
+# be frozen before the final test; criteria that need that profile (memory
+# growth rate, power draw) arrive then, as their own reviewed change, rather
+# than being invented now to look complete.
+version 1
+profile v0.1
+
+require peak_rss_bytes                 <=  1610612736   whole-process peak, 1.5 GiB, no swap
+require observation_p95_ms             <=  10000        per semantic observation at the fixed image/ROI profile
+require package_event_latency_p95_ms   <=  45000        from first visible placement in ground truth, confirmation included
+require package_precision              >=  0.95         on held-out scenes
+require package_recall                 >=  0.90         on held-out scenes
+require false_package_events_per_24h   <=  1            negative continuous run
+require door_earliest_event_s          >=  300          no door event before 300 s of valid evidence
+require uptime_hours                   >=  24           no crash, no unbounded queue
+require offline_operation              >=  1            1 when fully functional with networking disabled

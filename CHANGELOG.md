@@ -58,7 +58,17 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   and several gigabytes, and a manifest with invented hashes would be worse
   than none, so `make setup` fails closed until `pin-model.sh` has measured
   real files.
-- `make format-check` now covers `src/*.h`, which it had been skipping.
+- Benchmark report and release gate (`src/gw_report.h`, `make report-check`),
+  the second piece of W03. A report carries provenance — model and engine
+  hashes, quantisation of every component, compiler flags, OS, hardware, ROI,
+  resolution, sampling, prompt, token limit, cold or warm start — and its
+  measurements; `benchmarks/criteria/v0.1.criteria` carries the plan's
+  section-9 targets, committed before any hardware number exists so they
+  cannot be tuned to fit one. Grading refuses outright when provenance is
+  incomplete, reports every criterion whether met or not, and counts an
+  unmeasured criterion as not demonstrated rather than as a pass.
+- `make format-check` now covers `src/*.h` and `benchmarks/*.c`, which it had
+  been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch
   mid-scene. A process restart is the one sequence the criteria list that
   cannot be expressed as a label: nothing the camera sees says the
