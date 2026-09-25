@@ -1,0 +1,97 @@
+name: CI
+
+# Everything here is model-free and offline. The plan requires that
+# camera and model tests be reported separately and that a missing model
+# must never let an explicit test-e2e or release call pass; those jobs
+# arrive with the milestones that introduce them (W03/W04, W06), and
+# their absence here is deliberate rather than an oversight.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64 gcc
+            runner: ubuntu-24.04
+            target: linux-x86_64
+            cc: gcc-14
+          - name: linux-x86_64 clang
+            runner: ubuntu-24.04
+            target: linux-x86_64
+            cc: clang-19
+          - name: linux-aarch64 gcc
+            runner: ubuntu-24.04-arm
+            target: linux-aarch64
+            cc: gcc-14
+          - name: macos-arm64 clang
+            runner: macos-15
+            target: darwin-arm64
+            cc: cc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compiler (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.cc }}" = "clang-19" ]; then
+            sudo apt-get install -y clang-19
+          else
+            sudo apt-get install -y gcc-14
+          fi
+
+      - name: Effective configuration
+        run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} print-config
+
+      - name: Model-free tests
+        run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} check
+
+      - name: Model-free tests under ASan/UBSan
+        run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} MODE=asan check
+
+      - name: Library builds
+        run: make CC=${{ matrix.cc }} TARGET=${{ matrix.target }} lib
+
+  style:
+    name: format and static analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-19 clang-19
+          sudo update-alternatives --install /usr/bin/clang-format clang-format \
+            /usr/bin/clang-format-19 100
+      - run: make format-check
+      - run: make CC=clang-19 analyze
+
+  # pi5 is a separate target precisely so a generic ARM64 board cannot
+  # inherit -mcpu=cortex-a76. Cross-compiling it here proves the flag
+  # reaches the compiler; running it needs the hardware runner the plan
+  # reserves for trusted revisions only.
+  cross-pi5:
+    name: pi5 cross-compile
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14-aarch64-linux-gnu
+      - run: |
+          make CC=aarch64-linux-gnu-gcc-14 \
+               AR=aarch64-linux-gnu-gcc-ar-14 \
+               RANLIB=aarch64-linux-gnu-gcc-ranlib-14 \
+               TARGET=pi5 lib
