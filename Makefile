@@ -71,10 +71,10 @@ check-headers: | $(BUILD)
 	    | $(CXX) -std=c++17 -Wall -Wextra -pedantic-errors -Iinclude -x c++ - -o $(BUILD)/header-cxx
 
 format:
-	clang-format -i include/*.h src/*.c tests/*.c tests/*.h
+	clang-format -i include/*.h src/*.h src/*.c tests/*.c tests/*.h
 
 format-check:
-	@clang-format --dry-run --Werror include/*.h src/*.c tests/*.c tests/*.h
+	@clang-format --dry-run --Werror include/*.h src/*.h src/*.c tests/*.c tests/*.h
 
 # One file at a time: `clang --analyze` writes a report per input and
 # refuses a single -o for several of them. BENCH_SRC is empty until the

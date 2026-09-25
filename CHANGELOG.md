@@ -31,6 +31,7 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   the event it otherwise withholds. They are not evidence about detection
   quality; `benchmarks/README.md` says so, and says which sequences only
   real footage can settle.
+- `make format-check` now covers `src/*.h`, which it had been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch
   mid-scene. A process restart is the one sequence the criteria list that
   cannot be expressed as a label: nothing the camera sees says the
