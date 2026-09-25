@@ -1,0 +1,165 @@
+name: Raspberry Pi 5
+
+# The board is a persistent self-hosted machine. Only branches in this
+# repository may execute PR code on it; fork PRs must never run on the private
+# host. Mirrors geistshell's gate deliberately — one Pi, one rule.
+#
+# What this adds over the cross-compile job in ci.yml: that one proves
+# -mcpu=cortex-a76 reaches the compiler. This one proves the result RUNS, and
+# it is the prerequisite for W03's measurements, which are the whole reason
+# the plan reserves hardware at all.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi5-geist-watch-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: model-free suite (Pi 5, native)
+    if: >-
+      ${{ github.event_name != 'pull_request' ||
+          (!github.event.pull_request.draft &&
+           github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, Linux, ARM64, pi5]
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify Pi 5 environment
+        run: |
+          set -eu
+          test "$(uname -m)" = aarch64
+          gcc --version | head -n 1
+          test "$(gcc -dumpversion | cut -d. -f1)" -ge 14
+          nproc
+          vcgencmd measure_temp 2>/dev/null || true
+          vcgencmd get_throttled 2>/dev/null || true
+
+      - name: Effective configuration
+        run: make TARGET=pi5 print-config
+
+      # TARGET=pi5 explicitly: the board answers uname -m with aarch64, so the
+      # auto-detected target would be the generic linux-aarch64 one and the
+      # Cortex-A76 flags this job exists to exercise would never be applied.
+      - name: Model-free suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          make TARGET=pi5 check | tee pi5-check.log
+
+      - name: Model-free suite under ASan/UBSan
+        shell: bash
+        run: |
+          set -euo pipefail
+          make TARGET=pi5 MODE=asan check | tee -a pi5-check.log
+
+      # `make check` prints "<test> PASS" or "<test> FAIL" per binary. Turning
+      # the FAILs into annotations is the only way a red leg says anything to
+      # something that is not a browser: Actions logs are in no API.
+      - name: Name the failing tests
+        if: failure()
+        run: |
+          [ -f pi5-check.log ] || exit 0
+          if grep -qE ' FAIL$' pi5-check.log; then
+            grep -E ' FAIL$' pi5-check.log | head -20 \
+              | while IFS= read -r line; do echo "::error::$line"; done
+          else
+            echo "::error::the suite failed without naming a test; tail follows"
+            tail -15 pi5-check.log | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+
+      - name: Library builds for the board
+        if: always()
+        run: make TARGET=pi5 lib
+
+      - name: Replay the scenes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          make TARGET=pi5 bench | tee pi5-bench.txt
+
+      - name: Render the report
+        if: always()
+        run: |
+          set -eu
+          {
+            echo '### Scene replay (Pi 5, native, TARGET=pi5)'
+            echo '```text'
+            cat pi5-bench.txt 2>/dev/null || echo 'the replay produced no output'
+            echo '```'
+          } > pi5-report.md
+          cat pi5-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per pull request, updated in place. The scenes are
+      # synthetic and deterministic, so the text is byte-identical between
+      # runs: a change in this comment is a change in behaviour. That is only
+      # legible because the comment is not reposted on every push.
+      - name: Report on the pull request
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        env:
+          PI5_JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- pi5-geist-watch -->';
+            let report;
+            try {
+              report = fs.readFileSync('pi5-report.md', 'utf8');
+            } catch {
+              report = '_No report was produced._\n';
+            }
+            const { owner, repo } = context.repo;
+            const runUrl =
+              `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = [
+              marker,
+              `### Raspberry Pi 5 — \`${context.payload.pull_request.head.sha.slice(0, 8)}\``,
+              `job \`${process.env.PI5_JOB_STATUS}\` · [run ${context.runId}](${runUrl})`,
+              '',
+              report,
+            ].join('\n');
+
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            // Only ever edit our own comment: matching on the marker alone
+            // would let any comment quoting it be overwritten.
+            const mine = comments.find(
+              (c) => c.user?.type === 'Bot' && c.body?.includes(marker),
+            );
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geist-watch-pi5-${{ github.run_id }}
+          path: |
+            pi5-bench.txt
+            pi5-check.log
+          if-no-files-found: ignore
+          retention-days: 14
