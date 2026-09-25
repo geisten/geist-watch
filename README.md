@@ -75,8 +75,13 @@ engine, which quantisation, which image profile — or it is not graded at all:
 a verdict about a run nobody can identify looks like evidence and is not. A
 criterion nobody measured counts as not demonstrated, never as a pass.
 
-Capture, the model adapter, the CLI, packaging and the Raspberry Pi
-performance harness belong to later work packages and are not present yet.
+The first measurements with a real model run on the Pi from the
+`W03 (Pi 5, manual)` workflow — how to record and label footage, pin a model
+and measure is in [`benchmarks/w03/README.md`](benchmarks/w03/README.md).
+Footage stays on the Pi; results go to the measurement-log issue.
+
+Capture, the product's model adapter, the CLI and packaging belong to later
+work packages and are not present yet.
 Small-model support and Pi performance must be demonstrated before the release
 model is chosen; the engine is not pinned until then.
 

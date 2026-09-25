@@ -99,7 +99,9 @@ report-check: $(BUILD)/report_check
 
 check: test check-headers
 
-test: $(TEST_BINS)
+# The shell tests drive the replay and grading binaries as a user would, so
+# they are prerequisites of the suite rather than something a test builds.
+test: $(TEST_BINS) $(BUILD)/replay $(BUILD)/report_check
 	@fail=0; \
 	for t in $(TEST_BINS); do \
 	    printf '%-28s ' "$$(basename $$t)"; \
@@ -107,7 +109,8 @@ test: $(TEST_BINS)
 	done; \
 	for t in $(TEST_SH); do \
 	    printf '%-28s ' "$$(basename $$t)"; \
-	    if sh $$t; then echo PASS; else echo FAIL; fail=1; fi; \
+	    if GW_REPLAY=$(BUILD)/replay GW_REPORT_CHECK=$(BUILD)/report_check sh $$t; \
+	    then echo PASS; else echo FAIL; fail=1; fi; \
 	done; \
 	exit $$fail
 
