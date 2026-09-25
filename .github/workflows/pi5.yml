@@ -92,9 +92,15 @@ jobs:
       - name: Replay the scenes
         if: always()
         shell: bash
+        # -s so the captured text is the result and nothing else. Make echoes
+        # each command it runs, and those lines carry the build directory —
+        # whose name is a hash of the compiler, its version and the flags. A
+        # toolchain bump would therefore change this comment without anything
+        # about the behaviour changing, which is exactly the property the
+        # comment was supposed to have.
         run: |
           set -euo pipefail
-          make TARGET=pi5 bench | tee pi5-bench.txt
+          make -s TARGET=pi5 bench | tee pi5-bench.txt
 
       - name: Render the report
         if: always()
