@@ -62,6 +62,19 @@ directory that looks complete and is not. No model is pinned yet: obtaining
 weights is a decision about a licence and several gigabytes, and a manifest
 with invented hashes would be worse than none.
 
+A benchmark run is graded against criteria that were frozen first:
+
+```sh
+make report-check REPORT=runs/pi5-2026-09-26.report
+```
+
+`benchmarks/criteria/v0.1.criteria` holds the plan's section-9 targets and is
+committed before any hardware number exists, so a threshold cannot be chosen
+to fit a result. A report must carry its provenance — which model, which
+engine, which quantisation, which image profile — or it is not graded at all:
+a verdict about a run nobody can identify looks like evidence and is not. A
+criterion nobody measured counts as not demonstrated, never as a pass.
+
 Capture, the model adapter, the CLI, packaging and the Raspberry Pi
 performance harness belong to later work packages and are not present yet.
 Small-model support and Pi performance must be demonstrated before the release

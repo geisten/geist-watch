@@ -22,6 +22,10 @@ BENCH_SCENES := $(wildcard benchmarks/scenes/*.scene)
 # the model-free timing core and nothing else.
 RULE_SRC := src/gw_rules.c
 
+# Benchmark report and the release gate. Tool-side like the harness: grading
+# a run is a measurement concern, not product runtime.
+REPORT_SRC := src/gw_report.c
+
 TEST_SRC  := $(wildcard tests/test_*.c)
 TEST_BINS := $(TEST_SRC:tests/%.c=$(BUILD)/%)
 
@@ -32,7 +36,7 @@ TEST_SH := $(wildcard tests/test_*.sh)
 
 COMPILE = $(CC) $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc
 
-.PHONY: all lib check test check-headers format format-check analyze clean help print-config bench setup
+.PHONY: all lib check test check-headers format format-check analyze clean help print-config bench setup report-check
 
 all: lib
 
@@ -49,9 +53,12 @@ $(BUILD):
 	@mkdir -p $(BUILD)
 
 $(BUILD)/%: tests/%.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
-	$(COMPILE) -Itests $< $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
+	$(COMPILE) -Itests $< $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC) $(REPORT_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
 
 $(BUILD)/replay: benchmarks/replay.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
+	$(COMPILE) $^ $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
+
+$(BUILD)/report_check: benchmarks/report_check.c $(REPORT_SRC) $(CORE_SRC) | $(BUILD)
 	$(COMPILE) $^ $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
 
 # Replay every scene and report. Model-free: the scenes carry labels that
@@ -81,6 +88,15 @@ setup:
 
 # The model-free gate. This is what must pass on every supported platform
 # with no engine, no model and no camera present.
+# Grade a benchmark report against the frozen v0.1 criteria. The criteria
+# are committed before any hardware number exists, so they cannot be tuned
+# to fit one.
+#
+#   make report-check REPORT=runs/pi5-2026-09-26.report
+report-check: $(BUILD)/report_check
+	@test -n "$(REPORT)" || { echo "usage: make report-check REPORT=<file>"; exit 2; }
+	$(BUILD)/report_check --criteria benchmarks/criteria/v0.1.criteria "$(REPORT)"
+
 check: test check-headers
 
 test: $(TEST_BINS)
@@ -112,7 +128,7 @@ format-check:
 # refuses a single -o for several of them. This covers whatever the tree
 # has, library or not.
 analyze:
-	@for f in $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC); do \
+	@for f in $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC) $(REPORT_SRC); do \
 	    echo "  analyze $$f"; \
 	    $(CC) --analyze $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc $$f -o /dev/null || exit 1; \
 	done
@@ -135,6 +151,7 @@ help:
 	@echo "  make format-check    clang-format, no changes made"
 	@echo "  make bench           replay the scenes and report TP/FP/FN"
 	@echo "  make setup MODEL=x   install a pinned model (never automatic)"
+	@echo "  make report-check    grade a benchmark report against v0.1 criteria"
 	@echo "  make analyze         clang static analysis"
 	@echo "  make print-config    effective configuration"
 	@echo ""
