@@ -67,6 +67,17 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   cannot be tuned to fit one. Grading refuses outright when provenance is
   incomplete, reports every criterion whether met or not, and counts an
   unmeasured criterion as not demonstrated rather than as a pass.
+- W03 harness: `tools/vlm-observe.sh` asks one frame one question and accepts
+  only yes, no or unknown — grammar-constrained where the backend supports
+  it, and strictly parsed regardless, with any other reply recorded as
+  unknown and counted. `tools/w03-run.sh` runs labelled real footage through
+  it, replays the model's answers through the same temporal core, and writes
+  a report graded by `report_check`: frame agreement, invalid replies,
+  cold-start latency p50/p95, peak RSS, and precision and recall on held-out
+  scenes only. The `W03 (Pi 5, manual)` workflow lists, pins and measures on
+  the board and posts every result to the measurement-log issue; footage is
+  read in place and never leaves the Pi. The reference engine is llama.cpp
+  b11191, pinned by commit and refused if the tag has moved.
 - `make format-check` now covers `src/*.h` and `benchmarks/*.c`, which it had
   been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch

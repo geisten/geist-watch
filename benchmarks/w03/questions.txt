@@ -1,0 +1,14 @@
+# Observation questions for W03, one per rule id: `<rule_id> <question>`.
+#
+# These are FULL-FRAME questions, deliberately not the product's. The rule
+# templates in src/gw_rules.c ask about "the marked region", which assumes the
+# frame has been cropped to the rule's region first — and cropping belongs to
+# W06, not here. Asking a model about a region the image does not show would
+# measure the model's confusion, not its vision.
+#
+# The prompt_id below goes into every report produced with this file. Change
+# a question and you must change the id: a latency or a precision measured
+# with different words is a different measurement.
+prompt_id w03-fullframe-v1
+doorstep   Is there a package or parcel lying on the ground in front of the door?
+front-door Is the door open?

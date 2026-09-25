@@ -1,0 +1,16 @@
+# The reference inference engine for W03, pinned by tag AND commit.
+#
+# The plan names llama.cpp/mtmd as the development baseline on the Pi —
+# explicitly not the product, which is the native geistlib path (W04). A
+# baseline is only a baseline if it holds still, so both are recorded: the
+# tag is how it was chosen, the commit is what is trusted. Tags can move;
+# the workflow clones the tag and refuses to build unless HEAD is exactly
+# this commit.
+#
+# b11191 was the newest release tag when W03 began. Its own docs list
+# SmolVLM-500M-Instruct as supported through ggml-org's pre-quantised GGUFs,
+# and its llama-mtmd-cli runs one turn when both -p and --image are given,
+# printing the generated tokens to stdout and logs to stderr — both checked
+# in the source at this commit, not assumed.
+tag     b11191
+commit  4b1a27fa0eb875bbca4f6cfe936e3d65adc685c0

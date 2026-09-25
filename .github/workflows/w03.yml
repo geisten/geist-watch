@@ -1,0 +1,288 @@
+name: W03 (Pi 5, manual)
+
+# Plan work package W03: compare small VLMs on the Pi, with a report that can
+# be defended. Manual only — every run downloads, builds or measures on a
+# private machine, and none of that belongs on a push.
+#
+# Three modes, on purpose, because the path from "a model exists" to "a
+# measurement" passes through a human review:
+#
+#   list     what files does this repo revision actually contain, and which
+#            commit does the revision resolve to? Nothing is guessed.
+#   pin      download the chosen files ON THE PI, measure them with
+#            tools/pin-model.sh, post the manifest. The manifest is then
+#            committed through a pull request — never trusted unread.
+#   measure  install the pinned model through `make setup` (verified, from
+#            the files pin left on the Pi, no network), build the pinned
+#            reference engine, put the footage through tools/w03-run.sh, and
+#            grade the report against benchmarks/criteria/v0.1.criteria.
+#
+# Every result is posted to the measurement-log issue: workflow_dispatch has
+# no pull request to comment on, and Actions logs, summaries and artifact
+# bytes are in no API. Footage is never posted and never uploaded — frames
+# are read where they lie on the Pi.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "list | pin | measure"
+        type: choice
+        options: [list, pin, measure]
+        default: list
+      hf_repo:
+        description: "list/pin: Hugging Face repo"
+        default: ggml-org/SmolVLM-500M-Instruct-GGUF
+      hf_revision:
+        description: "list/pin: branch, tag or commit (resolved to a commit either way)"
+        default: main
+      files:
+        description: "pin: space-separated file names from the list output"
+        default: ""
+      license:
+        description: "pin: licence id, only if the repo card does not state one"
+        default: ""
+      model:
+        description: "pin/measure: manifest name under tools/models/"
+        default: smolvlm-500m
+      footage:
+        description: "measure: absolute path ON THE PI to a directory of *.scene files"
+        default: ""
+      issue:
+        description: "issue number that receives the result"
+        default: "9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi5-geist-watch-w03
+  cancel-in-progress: false
+
+jobs:
+  w03:
+    name: W03 ${{ inputs.mode }} (Pi 5)
+    runs-on: [self-hosted, Linux, ARM64, pi5]
+    timeout-minutes: 180
+
+    permissions:
+      contents: read
+      issues: write
+
+    # Inputs reach the scripts as environment variables, never as ${{ }}
+    # text spliced into a shell line: a value is data, and interpolating it
+    # into a script is how data becomes code.
+    env:
+      MODE: ${{ inputs.mode }}
+      HF_REPO: ${{ inputs.hf_repo }}
+      HF_REVISION: ${{ inputs.hf_revision }}
+      FILES: ${{ inputs.files }}
+      LICENSE_OVERRIDE: ${{ inputs.license }}
+      MODEL: ${{ inputs.model }}
+      FOOTAGE: ${{ inputs.footage }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate inputs
+        run: |
+          set -eu
+          ok() { printf '%s' "$2" | grep -Eq "$3" || { echo "::error::$1 '$2' is not acceptable"; exit 1; }; }
+          ok hf_repo "$HF_REPO" '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'
+          ok hf_revision "$HF_REVISION" '^[A-Za-z0-9._-]+$'
+          ok model "$MODEL" '^[a-z0-9][a-z0-9-]*$'
+          for f in $FILES; do ok file "$f" '^[A-Za-z0-9._-]+$'; done
+          if [ "$MODE" = measure ]; then
+            case "$FOOTAGE" in /*) ;; *) echo "::error::footage must be an absolute path on the Pi"; exit 1 ;; esac
+            [ -d "$FOOTAGE" ] || { echo "::error::no directory at $FOOTAGE on this machine"; exit 1; }
+          fi
+          # Downloads and the engine build persist across runs in the runner
+          # user's cache. Set here rather than in `env:` because Actions does
+          # not expand $HOME there.
+          cache="$HOME/.cache/geist-watch"
+          mkdir -p "$cache"
+          echo "CACHE=$cache" >> "$GITHUB_ENV"
+          : > post.md
+
+      - name: Verify Pi 5 environment
+        run: |
+          set -eu
+          test "$(uname -m)" = aarch64
+          for tool in curl python3 git; do command -v "$tool" >/dev/null || { echo "::error::$tool is required"; exit 1; }; done
+          if [ "$MODE" = measure ]; then
+            for tool in cmake file; do command -v "$tool" >/dev/null || { echo "::error::$tool is required for measure"; exit 1; }; done
+            # GNU time measures latency and peak RSS. Without it the harness
+            # refuses rather than reporting zeros that would grade as fast.
+            /usr/bin/time -f '%e %M' true 2>/dev/null \
+              || { echo "::error::GNU time is required for measure (apt install time)"; exit 1; }
+            test "$(gcc -dumpversion | cut -d. -f1)" -ge 14
+          fi
+          vcgencmd measure_temp 2>/dev/null || true
+          vcgencmd get_throttled 2>/dev/null || true
+
+      # --- list and pin: resolve the revision to a commit ------------------
+
+      - name: Resolve the revision
+        if: inputs.mode != 'measure'
+        run: |
+          set -eu
+          curl -fsSL "https://huggingface.co/api/models/$HF_REPO/revision/$HF_REVISION?blobs=true" -o hf.json \
+            || { echo "::error::could not query $HF_REPO@$HF_REVISION"; exit 1; }
+          python3 - <<'PY'
+          import json, os
+          d = json.load(open("hf.json"))
+          sha = d["sha"]
+          lic = (d.get("cardData") or {}).get("license") or ""
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"HF_SHA={sha}\nHF_LICENSE={lic}\n")
+          rows = []
+          for s in d.get("siblings", []):
+              size = s.get("size") or (s.get("lfs") or {}).get("size")
+              rows.append(f"| `{s['rfilename']}` | {size if size is not None else '?'} |")
+          with open("post.md", "a") as f:
+              f.write(f"### `{os.environ['HF_REPO']}` @ `{os.environ['HF_REVISION']}` → `{sha}`\n\n")
+              f.write(f"licence on the card: `{lic or 'none stated'}`\n\n")
+              f.write("| file | bytes |\n| --- | --- |\n" + "\n".join(rows) + "\n\n")
+          PY
+
+      - name: Download and pin
+        if: inputs.mode == 'pin'
+        run: |
+          set -eu
+          [ -n "$FILES" ] || { echo "::error::pin needs files: run mode=list first and choose"; exit 1; }
+          license=${LICENSE_OVERRIDE:-$HF_LICENSE}
+          [ -n "$license" ] || { echo "::error::the card states no licence; pass one explicitly"; exit 1; }
+          dest="$CACHE/incoming/$MODEL@$HF_SHA"
+          stage="$dest.partial"
+          rm -rf "$stage" && mkdir -p "$stage"
+          for f in $FILES; do
+            echo "fetching $f"
+            curl -fL --retry 3 -o "$stage/$f" "https://huggingface.co/$HF_REPO/resolve/$HF_SHA/$f"
+          done
+          rm -rf "$dest" && mv "$stage" "$dest"
+          sh tools/pin-model.sh --dir "$dest" --name "$MODEL" --revision "$HF_SHA" \
+             --license "$license" --repo "$HF_REPO" \
+             --license-url "https://huggingface.co/$HF_REPO" \
+             --base-url "https://huggingface.co/$HF_REPO/resolve/$HF_SHA" > manifest.model
+          {
+            echo "### Manifest for \`tools/models/$MODEL.model\`"
+            echo
+            echo "Measured on the Pi from the downloaded files, which stay at \`incoming/$MODEL@$HF_SHA\` for \`measure\`. Review before committing."
+            echo
+            echo '```'
+            cat manifest.model
+            echo '```'
+          } >> post.md
+
+      # --- measure ---------------------------------------------------------
+
+      - name: Install the pinned model
+        if: inputs.mode == 'measure'
+        run: |
+          set -eu
+          manifest="tools/models/$MODEL.model"
+          [ -f "$manifest" ] || { echo "::error::no $manifest on this branch: pin it and commit the manifest first"; exit 1; }
+          rev=$(awk '$1 == "revision" { print $2 }' "$manifest")
+          # Verified against the manifest byte for byte, from the files pin
+          # left on this machine. No network: the plan's offline promise
+          # starts at install time.
+          make setup MODEL="$MODEL" FROM="$CACHE/incoming/$MODEL@$rev"
+          dir="${XDG_DATA_HOME:-$HOME/.local/share}/geist-watch/models/$MODEL"
+          mmproj=$(ls "$dir"/mmproj*.gguf 2>/dev/null | head -n 1)
+          text=$(ls "$dir"/*.gguf | grep -v '/mmproj' | head -n 1)
+          [ -n "$mmproj" ] && [ -n "$text" ] || { echo "::error::expected one text GGUF and one mmproj*.gguf in $dir"; exit 1; }
+          quant() { basename "$1" | sed -n 's/.*[-.]\(Q[0-9][A-Za-z0-9_]*\|[Bb]\{0,1\}[Ff]16\|[Ff]32\)\.gguf$/\1/p'; }
+          qt=$(quant "$text"); qm=$(quant "$mmproj")
+          {
+            echo "GW_VLM_MODEL=$text"
+            echo "GW_VLM_MMPROJ=$mmproj"
+            echo "GW_MODEL_ID=$MODEL"
+            echo "GW_MODEL_QUANT=text=${qt:-$(basename "$text")} mmproj=${qm:-$(basename "$mmproj")}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the pinned reference engine
+        if: inputs.mode == 'measure'
+        run: |
+          set -eu
+          tag=$(awk '$1 == "tag" { print $2 }' benchmarks/w03/reference)
+          commit=$(awk '$1 == "commit" { print $2 }' benchmarks/w03/reference)
+          src="$CACHE/llama.cpp-$commit"
+          if [ ! -x "$src/build/bin/llama-mtmd-cli" ]; then
+            rm -rf "$src"
+            git clone -q --depth 1 --branch "$tag" https://github.com/ggml-org/llama.cpp.git "$src"
+            # Tags can move. The commit is what is trusted.
+            have=$(git -C "$src" rev-parse HEAD)
+            [ "$have" = "$commit" ] || { echo "::error::tag $tag is $have now, pinned $commit; refusing to build"; rm -rf "$src"; exit 1; }
+            cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release \
+                  -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF \
+                  -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DGGML_NATIVE=ON
+            cmake --build "$src/build" --target llama-mtmd-cli -j "$(nproc)"
+          fi
+          [ "$(git -C "$src" rev-parse HEAD)" = "$commit" ] || { echo "::error::cached engine is not at the pinned commit"; exit 1; }
+          cc=$(awk -F= '/^CMAKE_C_COMPILER:/ { print $2 }' "$src/build/CMakeCache.txt")
+          {
+            echo "GW_VLM_CLI=$src/build/bin/llama-mtmd-cli"
+            echo "GW_ENGINE_COMMIT=llama.cpp $tag $commit"
+            echo "GW_COMPILER=$("$cc" --version | head -n 1)"
+            echo "GW_COMPILER_FLAGS=cmake Release GGML_NATIVE=ON LLAMA_OPENSSL=OFF"
+          } >> "$GITHUB_ENV"
+
+      - name: Measure
+        if: inputs.mode == 'measure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Timing on, whatever the environment says: a disabled timer would
+          # omit latency, and this is the run whose latency is the point.
+          unset GW_TIME GW_VLM_CMD
+          build=$(make -s TARGET=pi5 print-config | awk '/^BUILD/ { print $3 }')
+          make -s TARGET=pi5 "$build/replay" "$build/report_check"
+          GW_REPLAY="$build/replay" sh tools/w03-run.sh --scenes "$FOOTAGE" --out w03-out
+          set +e
+          "$build/report_check" --criteria benchmarks/criteria/v0.1.criteria w03-out/run.report > grade.txt 2>&1
+          set -e
+          {
+            echo "### Measurement: \`$MODEL\` on \`$(basename "$FOOTAGE")\`"
+            echo
+            echo "Cold start per observation: every frame is a fresh process, so latency includes model load and is an upper bound."
+            echo
+            echo '```'
+            cat w03-out/run.report
+            echo '```'
+            echo
+            echo "#### Graded against \`benchmarks/criteria/v0.1.criteria\`"
+            echo
+            echo '```'
+            cat grade.txt
+            echo '```'
+          } >> post.md
+          # Criteria this run cannot measure (a soak, an offline check) are
+          # NOT MEASURED by construction, so an unmet gate is the expected
+          # outcome of W03 and not a job failure. The job fails only if the
+          # grader could not grade at all — and that is told apart by what it
+          # printed, not by its exit code, which is 1 for both.
+          grep -q 'criteria not demonstrated$' grade.txt \
+            || { echo "::error::report_check could not grade the report: $(head -n 1 grade.txt)"; exit 1; }
+
+      - name: Post to the measurement log
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          JOB_STATUS: ${{ job.status }}
+          ISSUE: ${{ inputs.issue }}
+        with:
+          script: |
+            const fs = require('fs');
+            let text = '';
+            try { text = fs.readFileSync('post.md', 'utf8'); } catch {}
+            const { owner, repo } = context.repo;
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const head = `**W03 \`${process.env.MODE}\`** · job \`${process.env.JOB_STATUS}\` · [run ${context.runId}](${run}) · \`${context.sha.slice(0, 8)}\``;
+            const body = [head, '', text || '_The run produced nothing to report; see the job for the failing step._'].join('\n');
+            const issue_number = Number(process.env.ISSUE);
+            if (!Number.isInteger(issue_number) || issue_number <= 0) {
+              core.setFailed(`issue must be a positive number, got '${process.env.ISSUE}'`);
+              return;
+            }
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
