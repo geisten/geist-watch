@@ -17,6 +17,11 @@ CORE_OBJ := $(CORE_SRC:src/%.c=$(BUILD)/%.o)
 BENCH_SRC   := src/gw_manifest.c src/gw_score.c
 BENCH_SCENES := $(wildcard benchmarks/scenes/*.scene)
 
+# Rule layer. Also outside libgeist_watch.a: sentences, regions and the
+# fixed DE/EN wordings are the product's surface, while the library is
+# the model-free timing core and nothing else.
+RULE_SRC := src/gw_rules.c
+
 TEST_SRC  := $(wildcard tests/test_*.c)
 TEST_BINS := $(TEST_SRC:tests/%.c=$(BUILD)/%)
 
@@ -39,7 +44,7 @@ $(BUILD):
 	@mkdir -p $(BUILD)
 
 $(BUILD)/%: tests/%.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
-	$(COMPILE) -Itests $< $(CORE_SRC) $(BENCH_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
+	$(COMPILE) -Itests $< $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC) $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
 
 $(BUILD)/replay: benchmarks/replay.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
 	$(COMPILE) $^ $(LDFLAGS) $(SAN_FLAGS) $(PROJECT_LIBS) -lm -o $@
@@ -71,16 +76,16 @@ check-headers: | $(BUILD)
 	    | $(CXX) -std=c++17 -Wall -Wextra -pedantic-errors -Iinclude -x c++ - -o $(BUILD)/header-cxx
 
 format:
-	clang-format -i include/*.h src/*.c tests/*.c tests/*.h
+	clang-format -i include/*.h src/*.h src/*.c tests/*.c tests/*.h
 
 format-check:
-	@clang-format --dry-run --Werror include/*.h src/*.c tests/*.c tests/*.h
+	@clang-format --dry-run --Werror include/*.h src/*.h src/*.c tests/*.c tests/*.h
 
 # One file at a time: `clang --analyze` writes a report per input and
-# refuses a single -o for several of them. BENCH_SRC is empty until the
-# harness exists, so this covers whatever the tree has.
+# refuses a single -o for several of them. This covers whatever the tree
+# has, library or not.
 analyze:
-	@for f in $(CORE_SRC) $(BENCH_SRC); do \
+	@for f in $(CORE_SRC) $(BENCH_SRC) $(RULE_SRC); do \
 	    echo "  analyze $$f"; \
 	    $(CC) --analyze $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc $$f -o /dev/null || exit 1; \
 	done

@@ -54,16 +54,16 @@ enum gw_split {
  * does reset that rule's evidence. Collapsing the two would let a scene
  * that simply omits a rule look like one that kept reporting on it. */
 struct gw_sample {
-    int64_t       t_ns;
-    char          frame[GW_BENCH_PATH_CAP];
+    int64_t t_ns;
+    char frame[GW_BENCH_PATH_CAP];
     enum gw_value label[GW_MAX_RULES];
-    bool          has_label[GW_MAX_RULES];
+    bool has_label[GW_MAX_RULES];
 };
 
 struct gw_truth {
     uint32_t rule;
-    char     event_type[GW_BENCH_TYPE_CAP];
-    int64_t  at_ns;
+    char event_type[GW_BENCH_TYPE_CAP];
+    int64_t at_ns;
     /* A detection counts for this event when it lands in
      * [at_ns - before_ns, at_ns + after_ns]. Fixed in the manifest
      * BEFORE a run, never tuned against results — that is the whole
@@ -73,18 +73,18 @@ struct gw_truth {
 };
 
 struct gw_scene {
-    char          name[GW_BENCH_TYPE_CAP];
-    char          camera[GW_ID_CAP];
+    char name[GW_BENCH_TYPE_CAP];
+    char camera[GW_ID_CAP];
     enum gw_split split;
 
     struct gw_rule_config rules[GW_MAX_RULES];
-    uint32_t              rule_count;
+    uint32_t rule_count;
 
     struct gw_sample samples[GW_BENCH_MAX_SAMPLES];
-    uint32_t         sample_count;
+    uint32_t sample_count;
 
     struct gw_truth truth[GW_BENCH_MAX_TRUTH];
-    uint32_t        truth_count;
+    uint32_t truth_count;
 
     /* How often the replay ticks the core, independent of samples. The
      * product's scheduler runs whether or not a frame arrived, and so
@@ -100,7 +100,7 @@ struct gw_scene {
      * sequences a scene must contain, and it is the one event that
      * cannot be expressed as a label — nothing the camera sees says the
      * process died. */
-    int64_t  restarts[GW_BENCH_MAX_RESTARTS];
+    int64_t restarts[GW_BENCH_MAX_RESTARTS];
     uint32_t restart_count;
 };
 
@@ -112,8 +112,8 @@ struct gw_scene {
 /* What a run produced. */
 struct gw_detection {
     uint32_t rule;
-    int64_t  at_ns;    /* observation time that completed it, not tick time */
-    uint32_t matched;  /* index into scene truth, or UINT32_MAX */
+    int64_t at_ns;    /* observation time that completed it, not tick time */
+    uint32_t matched; /* index into scene truth, or UINT32_MAX */
 };
 
 struct gw_metrics {
@@ -130,7 +130,7 @@ struct gw_metrics {
     /* Fraction of scene time in which the rule held a confirmed value.
      * Unknown phases stay in the denominator: a run that spent half the
      * scene blind and got the other half right is not a 100 % run. */
-    double  availability;
+    double availability;
     int64_t observed_ns;
     int64_t unknown_ns;
 };
