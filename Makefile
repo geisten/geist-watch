@@ -25,9 +25,14 @@ RULE_SRC := src/gw_rules.c
 TEST_SRC  := $(wildcard tests/test_*.c)
 TEST_BINS := $(TEST_SRC:tests/%.c=$(BUILD)/%)
 
+# Shell tests cover what is written in shell: the model setup verifies and
+# installs files, and a C test cannot exercise a rename or a staging
+# directory that must not survive a failure.
+TEST_SH := $(wildcard tests/test_*.sh)
+
 COMPILE = $(CC) $(CPPFLAGS) $(BASE_FLAGS) $(CFLAGS) -Iinclude -Isrc
 
-.PHONY: all lib check test check-headers format format-check analyze clean help print-config bench
+.PHONY: all lib check test check-headers format format-check analyze clean help print-config bench setup
 
 all: lib
 
@@ -56,6 +61,24 @@ $(BUILD)/replay: benchmarks/replay.c $(CORE_SRC) $(BENCH_SRC) | $(BUILD)
 bench: $(BUILD)/replay
 	$(BUILD)/replay --min-precision 0.95 --min-recall 0.90 $(BENCH_SCENES)
 
+# Explicit model acquisition. Never a dependency of anything: a build, a
+# test or a benchmark that quietly downloaded gigabytes would make an
+# offline machine look broken and a metered connection expensive. MODEL
+# names a manifest under tools/models/; FROM installs from a local
+# directory, which is what makes a fully net-free setup possible.
+#
+#   make setup MODEL=smolvlm-500m
+#   make setup MODEL=smolvlm-500m FROM=/media/weights/smolvlm
+setup:
+	@test -n "$(MODEL)" || { echo "usage: make setup MODEL=<name> [FROM=<dir>]"; \
+	    echo "available:"; \
+	    if ls tools/models/*.model >/dev/null 2>&1; then \
+	        ls tools/models/*.model | sed 's|.*/||;s|\.model$$||;s|^|  |'; \
+	    else \
+	        echo "  (none pinned yet — see tools/pin-model.sh)"; \
+	    fi; exit 2; }
+	sh tools/fetch-model.sh "$(MODEL)" $(if $(FROM),--from "$(FROM)",)
+
 # The model-free gate. This is what must pass on every supported platform
 # with no engine, no model and no camera present.
 check: test check-headers
@@ -65,6 +88,10 @@ test: $(TEST_BINS)
 	for t in $(TEST_BINS); do \
 	    printf '%-28s ' "$$(basename $$t)"; \
 	    if $$t; then echo PASS; else echo FAIL; fail=1; fi; \
+	done; \
+	for t in $(TEST_SH); do \
+	    printf '%-28s ' "$$(basename $$t)"; \
+	    if sh $$t; then echo PASS; else echo FAIL; fail=1; fi; \
 	done; \
 	exit $$fail
 
@@ -107,6 +134,7 @@ help:
 	@echo "  make MODE=asan check same, under ASan/UBSan"
 	@echo "  make format-check    clang-format, no changes made"
 	@echo "  make bench           replay the scenes and report TP/FP/FN"
+	@echo "  make setup MODEL=x   install a pinned model (never automatic)"
 	@echo "  make analyze         clang static analysis"
 	@echo "  make print-config    effective configuration"
 	@echo ""

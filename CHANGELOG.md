@@ -45,6 +45,19 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   `gw_add_rule`, so it cannot produce a configuration the core will not
   run. Not part of `libgeist_watch.a`: the library stays the model-free
   timing core.
+- Explicit model setup (`tools/pin-model.sh`, `tools/fetch-model.sh`,
+  `make setup`), the first piece of plan work package W03. A manifest pins
+  the revision, licence, and every file's SHA-256 and byte count, including
+  the vision tower and projector; installs are staged, verified in full, and
+  only then renamed into place, so an interrupted run leaves the previous
+  install or nothing. `--from` installs from a local directory with the same
+  verification and no network, which is what makes a net-free setup possible.
+  Nothing downloads implicitly: `setup` is never a dependency of a build, a
+  test or a benchmark.
+  No model is pinned yet — obtaining weights is a decision about a licence
+  and several gigabytes, and a manifest with invented hashes would be worse
+  than none, so `make setup` fails closed until `pin-model.sh` has measured
+  real files.
 - `make format-check` now covers `src/*.h`, which it had been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch
   mid-scene. A process restart is the one sequence the criteria list that

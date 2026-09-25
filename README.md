@@ -48,6 +48,20 @@ that contradicts one given on the command line. Refusing is the point: a
 matcher that guesses produces a valid rule watching for the wrong thing, and
 every confirmation the core then makes is correct for that wrong rule.
 
+Models are installed explicitly and never as a side effect of a build:
+
+```sh
+make setup MODEL=<name>                  # verified against a pinned manifest
+make setup MODEL=<name> FROM=/media/w    # same checks, no network at all
+```
+
+A manifest records the revision, the licence, and every file's SHA-256 and
+byte count. Installs are staged, verified whole, then renamed into place, so
+an interrupted setup leaves the previous install or nothing — never a
+directory that looks complete and is not. No model is pinned yet: obtaining
+weights is a decision about a licence and several gigabytes, and a manifest
+with invented hashes would be worse than none.
+
 Capture, the model adapter, the CLI, packaging and the Raspberry Pi
 performance harness belong to later work packages and are not present yet.
 Small-model support and Pi performance must be demonstrated before the release
