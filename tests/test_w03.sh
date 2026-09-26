@@ -131,4 +131,37 @@ mkdir -p "$W/mb" && cp "$W/mailbox.scene" "$W/mb/" && cp -r "$F/frames" "$W/mb/"
 out=$(sh "$RUN" --scenes "$W/mb" --out "$W/mbout" 2>&1 || true)
 printf '%s' "$out" | grep -q "no question for rule 'mailbox'" || bad "an unknown rule must be refused, got: $out"
 
+# --- the request file behind the push trigger ---------------------------
+
+REQ="$ROOT/tools/w03-request.sh"
+req() { sh "$REQ" "$@" 2>&1; }
+
+# The template on main must itself be a valid request.
+out=$(req "$ROOT/benchmarks/w03/request") || bad "the committed request template does not parse: $out"
+printf '%s' "$out" | grep -qx 'MODE=list' || bad "the template should request list"
+
+printf 'mode pin\nfiles a.gguf mmproj-a.gguf\nhf_revision abc123\n' > "$W/r1"
+out=$(req "$W/r1") || bad "a valid pin request was refused: $out"
+printf '%s' "$out" | grep -qx 'FILES=a.gguf mmproj-a.gguf' || bad "files must pass through whole, spaces included"
+printf '%s' "$out" | grep -qx 'MODEL=smolvlm-500m' || bad "omitted keys must take the form's defaults"
+printf '%s' "$out" | grep -qx 'ISSUE=9' || bad "the default issue is the measurement log"
+
+printf 'mode list\nmodle x\n' > "$W/r2"
+req "$W/r2" | grep -q "unknown key 'modle'" || bad "a misspelled key must be refused, not ignored"
+printf '# nothing\n' > "$W/r3"
+req "$W/r3" | grep -q 'no mode given' || bad "a request without a mode must be refused"
+printf 'mode everything\n' > "$W/r4"
+req "$W/r4" | grep -q 'mode must be list, pin or measure' || bad "an unknown mode must be refused"
+printf 'mode list\nissue nine\n' > "$W/r5"
+req "$W/r5" | grep -q 'issue must be a number' || bad "a non-numeric issue must be refused"
+
+# The one that guards the channel: GITHUB_ENV is read line by line, so a
+# value with a newline in it would set a variable of the caller's choosing.
+out=$(IN_MODE=list IN_FOOTAGE="$(printf '/x\nLD_PRELOAD=/tmp/evil.so')" sh "$REQ" --from-env 2>&1 || true)
+printf '%s' "$out" | grep -q 'line break' || bad "a value with a newline must be refused, got: $out"
+printf '%s' "$out" | grep -q 'LD_PRELOAD' && bad "the injected variable reached the output"
+
+out=$(IN_MODE=measure IN_FOOTAGE=/home/pi/footage sh "$REQ" --from-env) || bad "a valid dispatch was refused"
+printf '%s' "$out" | grep -qx 'FOOTAGE=/home/pi/footage' || bad "dispatch values must pass through"
+
 exit $fail
