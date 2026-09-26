@@ -1,0 +1,18 @@
+# W03 request — pushing a change to this file on the branch `w03/run`
+# starts the W03 workflow on the Pi. On `main` it does nothing; it is the
+# template.
+#
+# Same fields as the Actions form, one `key value` per line. Omitted keys
+# take the form's defaults. The result lands in the measurement-log issue.
+#
+#   mode         list | pin | measure                    (required)
+#   footage      measure: absolute path ON THE PI to *.scene files
+#   model        pin/measure: manifest name    (default smolvlm-500m)
+#   hf_repo      list/pin  (default ggml-org/SmolVLM-500M-Instruct-GGUF)
+#   hf_revision  list/pin: branch, tag or commit          (default main)
+#   files        pin: space-separated file names from the list output
+#   license      pin: only if the model card states none
+#   issue        where the result is posted               (default 9)
+#
+# Only a path is ever written here, never footage.
+mode list

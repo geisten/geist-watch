@@ -68,6 +68,32 @@ sample 40000 frames/delivery-1-0040.jpg doorstep=yes
 A sample without a frame (`-`) is refused: that is a synthetic label, and a
 model cannot be scored on evidence it never saw.
 
+## Starting a run
+
+Every step below is one run of the **W03 (Pi 5, manual)** workflow, in one
+of two ways. Both accept the same fields and go through the same
+`tools/w03-request.sh`, so they cannot be read differently.
+
+**From the Actions page.** Open
+<https://github.com/geisten/geist-watch/actions/workflows/w03.yml>, press
+**Run workflow**, keep the branch at `main`, fill in the fields for the mode
+you want, and press the green **Run workflow** button. Or, with the GitHub
+CLI:
+
+```sh
+gh workflow run w03.yml -R geisten/geist-watch -f mode=list
+```
+
+**By request file.** Change `benchmarks/w03/request` and push it to the
+branch `w03/run` — the workflow starts on the Pi. This is how a run can be
+asked for without the Actions page, including by an agent that may push but
+may not dispatch workflows. It needs no new permission: anyone who can push
+could already put a workflow on a branch. Only a path is ever written into
+that file, never footage.
+
+Either way the result is a comment in the measurement-log issue (#9),
+including when the request itself was rejected.
+
 ## 3. Pin the model, once
 
 Run the workflow with **mode `list`** — it posts the files of
