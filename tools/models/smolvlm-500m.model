@@ -1,0 +1,15 @@
+# Pinned by tools/pin-model.sh. Every line below was measured, not
+# transcribed: fetch-model.sh refuses any file that differs by one byte.
+version      1
+name         smolvlm-500m
+repo         ggml-org/SmolVLM-500M-Instruct-GGUF
+revision     72e986006ef53e37cdd3f6d4241c90b0f01df376
+license      apache-2.0
+license_url  https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF
+base_url     https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/72e986006ef53e37cdd3f6d4241c90b0f01df376
+
+# sha256                                                           bytes      path
+file  9d4612de6a42214499e301494a3ecc2be0abdd9de44e663bda63f1152fad1bf4  436806912  SmolVLM-500M-Instruct-Q8_0.gguf
+file  d1eb8b6b23979205fdf63703ed10f788131a3f812c7b1f72e0119d5d81295150  108783360  mmproj-SmolVLM-500M-Instruct-Q8_0.gguf
+
+# 2 files, 545590272 bytes
