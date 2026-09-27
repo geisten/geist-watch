@@ -31,7 +31,11 @@ jobs:
           (!github.event.pull_request.draft &&
            github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: [self-hosted, Linux, ARM64, pi5]
-    timeout-minutes: 30
+    # The budget covers the wait as well as the work: the runner's
+    # job-started hook ("Set up runner") queues for the board-wide lock
+    # /tmp/pi-heavy.lock for up to 4 h while a soak or bisect holds the
+    # board. 30 min of work on top of that wait.
+    timeout-minutes: 270
 
     permissions:
       contents: read
