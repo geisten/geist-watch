@@ -22,6 +22,13 @@ name: W03 (Pi 5, manual)
 # bytes are in no API. Footage is never posted and never uploaded — frames
 # are read where they lie on the Pi.
 on:
+  # A push to w03/run that changes the request file is the same request as
+  # the form below, written down. That branch exists so a run can be asked
+  # for without a click in the Actions UI; it opens no new door, since anyone
+  # who can push can already put a workflow with `on: push` on any branch.
+  push:
+    branches: [w03/run]
+    paths: [benchmarks/w03/request]
   workflow_dispatch:
     inputs:
       mode:
@@ -60,7 +67,7 @@ concurrency:
 
 jobs:
   w03:
-    name: W03 ${{ inputs.mode }} (Pi 5)
+    name: W03 (Pi 5)
     runs-on: [self-hosted, Linux, ARM64, pi5]
     timeout-minutes: 180
 
@@ -68,22 +75,45 @@ jobs:
       contents: read
       issues: write
 
-    # Inputs reach the scripts as environment variables, never as ${{ }}
-    # text spliced into a shell line: a value is data, and interpolating it
-    # into a script is how data becomes code.
-    env:
-      MODE: ${{ inputs.mode }}
-      HF_REPO: ${{ inputs.hf_repo }}
-      HF_REVISION: ${{ inputs.hf_revision }}
-      FILES: ${{ inputs.files }}
-      LICENSE_OVERRIDE: ${{ inputs.license }}
-      MODEL: ${{ inputs.model }}
-      FOOTAGE: ${{ inputs.footage }}
-
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      # Both triggers resolve through one script, so a run from the request
+      # file and a run from the form cannot be read differently. Inputs reach
+      # it as environment variables, never as ${{ }} text spliced into a shell
+      # line: a value is data, and interpolating it is how data becomes code.
+      - name: Resolve the request
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_MODE: ${{ inputs.mode }}
+          IN_HF_REPO: ${{ inputs.hf_repo }}
+          IN_HF_REVISION: ${{ inputs.hf_revision }}
+          IN_FILES: ${{ inputs.files }}
+          IN_LICENSE: ${{ inputs.license }}
+          IN_MODEL: ${{ inputs.model }}
+          IN_FOOTAGE: ${{ inputs.footage }}
+          IN_ISSUE: ${{ inputs.issue }}
+        run: |
+          set -eu
+          if [ "$EVENT" = push ]; then
+            src=benchmarks/w03/request
+            echo "TRIGGER=request file on ${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            src=--from-env
+            echo "TRIGGER=manual dispatch" >> "$GITHUB_ENV"
+          fi
+          # A rejected request is reported in the issue, not only in the log:
+          # the log is in no API, and a request that silently did nothing is
+          # indistinguishable from one still queued.
+          if ! sh tools/w03-request.sh "$src" > request.env 2> request.err; then
+            { echo "### Request rejected"; echo; echo '```'; cat request.err; echo '```'; } > post.md
+            cat request.err >&2
+            exit 1
+          fi
+          cat request.env
+          cat request.env >> "$GITHUB_ENV"
 
       - name: Validate inputs
         run: |
@@ -121,12 +151,16 @@ jobs:
           vcgencmd measure_temp 2>/dev/null || true
           vcgencmd get_throttled 2>/dev/null || true
 
+      # Modes are chosen inside each step rather than with `if: inputs.mode`:
+      # a push has no inputs, so those conditions would quietly skip every
+      # step and report success. MODE comes from the resolve step for both.
+      #
       # --- list and pin: resolve the revision to a commit ------------------
 
       - name: Resolve the revision
-        if: inputs.mode != 'measure'
         run: |
           set -eu
+          [ "$MODE" != measure ] || exit 0
           curl -fsSL "https://huggingface.co/api/models/$HF_REPO/revision/$HF_REVISION?blobs=true" -o hf.json \
             || { echo "::error::could not query $HF_REPO@$HF_REVISION"; exit 1; }
           python3 - <<'PY'
@@ -147,9 +181,9 @@ jobs:
           PY
 
       - name: Download and pin
-        if: inputs.mode == 'pin'
         run: |
           set -eu
+          [ "$MODE" = pin ] || exit 0
           [ -n "$FILES" ] || { echo "::error::pin needs files: run mode=list first and choose"; exit 1; }
           license=${LICENSE_OVERRIDE:-$HF_LICENSE}
           [ -n "$license" ] || { echo "::error::the card states no licence; pass one explicitly"; exit 1; }
@@ -178,9 +212,9 @@ jobs:
       # --- measure ---------------------------------------------------------
 
       - name: Install the pinned model
-        if: inputs.mode == 'measure'
         run: |
           set -eu
+          [ "$MODE" = measure ] || exit 0
           manifest="tools/models/$MODEL.model"
           [ -f "$manifest" ] || { echo "::error::no $manifest on this branch: pin it and commit the manifest first"; exit 1; }
           rev=$(awk '$1 == "revision" { print $2 }' "$manifest")
@@ -202,9 +236,9 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build the pinned reference engine
-        if: inputs.mode == 'measure'
         run: |
           set -eu
+          [ "$MODE" = measure ] || exit 0
           tag=$(awk '$1 == "tag" { print $2 }' benchmarks/w03/reference)
           commit=$(awk '$1 == "commit" { print $2 }' benchmarks/w03/reference)
           src="$CACHE/llama.cpp-$commit"
@@ -229,10 +263,10 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Measure
-        if: inputs.mode == 'measure'
         shell: bash
         run: |
           set -euo pipefail
+          [ "$MODE" = measure ] || exit 0
           # Timing on, whatever the environment says: a disabled timer would
           # omit latency, and this is the run whose latency is the point.
           unset GW_TIME GW_VLM_CMD
@@ -270,7 +304,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           JOB_STATUS: ${{ job.status }}
-          ISSUE: ${{ inputs.issue }}
         with:
           script: |
             const fs = require('fs');
@@ -278,9 +311,11 @@ jobs:
             try { text = fs.readFileSync('post.md', 'utf8'); } catch {}
             const { owner, repo } = context.repo;
             const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const head = `**W03 \`${process.env.MODE}\`** · job \`${process.env.JOB_STATUS}\` · [run ${context.runId}](${run}) · \`${context.sha.slice(0, 8)}\``;
+            const head = `**W03 \`${process.env.MODE || '?'}\`** · job \`${process.env.JOB_STATUS}\` · [run ${context.runId}](${run}) · \`${context.sha.slice(0, 8)}\` · ${process.env.TRIGGER || 'unresolved request'}`;
             const body = [head, '', text || '_The run produced nothing to report; see the job for the failing step._'].join('\n');
-            const issue_number = Number(process.env.ISSUE);
+            // Falls back to the log issue when the request never resolved,
+            // so a malformed request is still reported somewhere readable.
+            const issue_number = Number(process.env.ISSUE || '9');
             if (!Number.isInteger(issue_number) || issue_number <= 0) {
               core.setFailed(`issue must be a positive number, got '${process.env.ISSUE}'`);
               return;

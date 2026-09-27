@@ -78,6 +78,12 @@ format is versioned separately by `GW_EVENT_SCHEMA_VERSION`.
   the board and posts every result to the measurement-log issue; footage is
   read in place and never leaves the Pi. The reference engine is llama.cpp
   b11191, pinned by commit and refused if the tag has moved.
+- W03 runs can be requested by pushing `benchmarks/w03/request` to the branch
+  `w03/run`, as well as from the Actions form. Both triggers resolve through
+  `tools/w03-request.sh`, which refuses unknown keys, a missing or unknown
+  mode, and any value containing a line break — a newline would let a value
+  set arbitrary variables through `$GITHUB_ENV` on the Pi. A rejected request
+  is reported in the measurement-log issue, not only in the job log.
 - `make format-check` now covers `src/*.h` and `benchmarks/*.c`, which it had
   been skipping.
 - `restart <t_ms>` in the scene manifest, re-initialising the watch
