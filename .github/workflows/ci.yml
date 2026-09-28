@@ -40,7 +40,7 @@ jobs:
             target: darwin-arm64
             cc: cc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install compiler (Linux)
         if: runner.os == 'Linux'
@@ -73,7 +73,7 @@ jobs:
     name: format and static analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install tools
         run: |
           sudo apt-get update
@@ -91,7 +91,7 @@ jobs:
     name: pi5 cross-compile
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           sudo apt-get update
           sudo apt-get install -y gcc-14-aarch64-linux-gnu
