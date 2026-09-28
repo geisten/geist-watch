@@ -68,6 +68,22 @@ sample 40000 frames/delivery-1-0040.jpg doorstep=yes
 A sample without a frame (`-`) is refused: that is a synthetic label, and a
 model cannot be scored on evidence it never saw.
 
+**A skeleton to start from.** `tools/w03-scaffold.sh` writes the scene for
+you from a directory of frames or from a video (one frame every `--every`
+seconds, via ffmpeg), with every label set to `?`:
+
+```sh
+tools/w03-scaffold.sh ~/geist-watch-footage delivery-1 ~/clips/delivery-1.mp4
+tools/w03-scaffold.sh --split dev ~/geist-watch-footage empty-1 ~/stills/empty-1/
+```
+
+Then open each `.scene`, replace every `?` with `yes`, `no` or `unknown`, and
+add the `truth` line where a package appears. The measure run refuses a scene
+that still holds a `?` — before the model is started, not an hour into it.
+The scaffold also refuses a sampling interval the rule cannot confirm at:
+`doorstep` needs three frames within 10 s (one every 5 s at most),
+`front-door` two within 2 s.
+
 ## Starting a run
 
 Every step below is one run of the **W03 (Pi 5, manual)** workflow, in one

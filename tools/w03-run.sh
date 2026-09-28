@@ -80,6 +80,12 @@ question_for() {
     awk -v id="$1" '$1 == id { $1 = ""; sub(/^ +/, ""); print; exit }' "$QUESTIONS"
 }
 
+# Every human label must be a real answer before any model runs. A skeleton
+# from w03-scaffold.sh still holds `?`, and a typo would otherwise surface
+# only as a disagreement after an hour on the board.
+badlabel=$(awk '$1 == "sample" { for (i = 4; i <= NF; i++) if ($i !~ /^[^=]+=(yes|no|unknown)$/) { print FILENAME ":" FNR ": " $i; exit } }' "$@")
+[ -z "$badlabel" ] || die "label not yet given at $badlabel; every label must be yes, no or unknown"
+
 first_frame=
 
 # Word-splitting the manifest lines is intended; glob-expanding them against
